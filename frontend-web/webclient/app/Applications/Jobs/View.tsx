@@ -608,7 +608,7 @@ const InfoCards: React.FunctionComponent<{job: Job, status: JobStatus}> = ({job,
             {machine?.cpu && machine.gpu ? <>&mdash;</> : null}
             {!machine?.gpu ? null : <>{" "}{machine?.gpu}x GPU</>}
         </InfoCard>
-        {job.status.resolvedApplication?.invocation?.tool?.tool?.description?.backend === "VIRTUAL_MACHINE" ?
+        {isVirtualMachine(job) ?
             null :
             <InfoCard
                 stat={prettyTime}
@@ -824,6 +824,10 @@ const RunningContent: React.FunctionComponent<{
         }, 1000);
     });
 
+    const suspend = React.useCallback(async (job: Job) => {
+        await invokeCommand(JobsApi.suspend(bulkRequestOf(job)));
+    }, []);
+
     return <>
         <RunningInfoWrapper>
             <HighlightedCard color={"purple"} isLoading={false} title={"Job info"} icon={"properties"}>
@@ -872,6 +876,15 @@ const RunningContent: React.FunctionComponent<{
                                     <Button data-duration={"24"} onClick={extendJob}>+24</Button>
                                     <Button data-duration={"48"} onClick={extendJob}>+48</Button>
                                 </AltButtonGroup>
+                                {!canSuspendVM(job) ? null :
+                                    <ConfirmationButton
+                                        width="330px"
+                                        mt="6px"
+                                        icon="activity"
+                                        actionText="Suspend Virtual Machine"
+                                        onAction={() => suspend(job)}
+                                    />
+                                }
                             </Box>
                         }
                     </Flex>
@@ -884,9 +897,9 @@ const RunningContent: React.FunctionComponent<{
 
         {!supportsLogs ? null :
             <RunningJobsWrapper>
-                {Array(job.specification.replicas).fill(0).map((_, i) => {
-                    return <RunningJobRank key={i} job={job} rank={i} updateListeners={updateListeners} />;
-                })}
+                {Array(job.specification.replicas).fill(0).map((_, i) =>
+                    <RunningJobRank key={i} job={job} rank={i} updateListeners={updateListeners} />
+                )}
             </RunningJobsWrapper>
         }
     </>;
@@ -1097,7 +1110,9 @@ const RunningButtonGroup: React.FunctionComponent<{
 }> = ({job, rank, expanded, toggleExpand}) => {
     const appInvocation = job.status.resolvedApplication!.invocation;
     const backendType = appInvocation.tool.tool!.description.backend;
+    // TODO(Jonas): This sometimes fails. Likely a race condition.
     const support = (job.status.resolvedSupport! as ResolvedSupport<never, ComputeSupport>).support;
+    // TODO(Jonas): End
     const supportTerminal =
         backendType === "VIRTUAL_MACHINE" ? support.virtualMachine.terminal :
             backendType === "DOCKER" ? support.docker.terminal : false;
@@ -1230,5 +1245,14 @@ const ProviderUpdates: React.FunctionComponent<{
     }, [updateListeners]);
     return <Box height={"200px"} ref={termRef} />
 };
+
+function isVirtualMachine(job: Job): boolean {
+    return job.status.resolvedApplication?.invocation?.tool?.tool?.description?.backend === "VIRTUAL_MACHINE";
+}
+
+function canSuspendVM(job: Job): boolean {
+    const {suspension} = (job.status.resolvedSupport?.support as ComputeSupport).virtualMachine;
+    return suspension === true;
+}
 
 export default View;
