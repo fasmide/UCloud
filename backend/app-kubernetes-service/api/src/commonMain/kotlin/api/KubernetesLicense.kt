@@ -47,6 +47,22 @@ typealias KubernetesLicenseUpdateResponse = Unit
 class KubernetesLicenseMaintenance(providerId: String) : CallDescriptionContainer("compute.licenses.ucloud.maintenance") {
     val baseContext = LicenseProvider(providerId).baseContext + "/maintenance"
 
+    init {
+        title = "Licenses"
+        description = """
+            Licenses are needed for applications where the software require a license to run e.g MatLab, Comsol etc..
+            The users need to acquire the license themselves outside of UCloud. If the license is a floating license, 
+            the license can be integrated into UCLoud using the License Product. 
+            When creating a license the user needs to specify the address to where this license can be found and a port 
+            to listen to.
+            Currently these licenses can only be created in UCloud by ADMINs. Once the license has been created the 
+            given project, who owns the license, will be given an allocation in their wallet. They will need to uses this 
+            allocation to share the license to their respective peers. Usually a license is bought by a university or 
+            faculty and all projects that apply to the main project of the given university/faculty will also be able to
+            apply for the license.
+        """.trimIndent()
+    }
+
     val create = call<KubernetesLicenseCreateRequest, KubernetesLicenseCreateResponse, CommonErrorMessage>("create") {
         httpCreate(baseContext, roles = Roles.ADMIN)
     }

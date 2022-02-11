@@ -30,6 +30,15 @@ typealias KubernetesIPMaintenanceRetrieveStatusResponse = K8NetworkStatus
 class KubernetesNetworkIPMaintenance(providerId: String) : CallDescriptionContainer("compute.networkip.ucloud.maintenance") {
     val baseContext = NetworkIPProvider(providerId).baseContext + "/maintenance"
 
+    init {
+        title = "NetworkIps / Public IP"
+        description = """
+            Public IPs are attached to applications to enable access by external third-party applications.
+            UCloud only supports a limited range of IPs for this feature, since we need to allocate
+            the IPs up front. 
+        """.trimIndent()
+    }
+
     val create = call<KubernetesIPMaintenanceCreateRequest, KubernetesIPMaintenanceCreateResponse,
         CommonErrorMessage>("create") {
         httpCreate(baseContext, roles = Roles.PRIVILEGED)
