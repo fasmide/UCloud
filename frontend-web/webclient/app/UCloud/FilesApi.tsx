@@ -20,7 +20,7 @@ import {
     readableUnixMode,
     sizeToString
 } from "@/Utilities/FileUtilities";
-import {displayErrorMessageOrDefault, doNothing, extensionFromPath, isLikelySafari, prettierString, removeTrailingSlash} from "@/UtilityFunctions";
+import {displayErrorMessageOrDefault, doNothing, extensionFromPath, isExtPreviewSupported, isLikelySafari, prettierString, removeTrailingSlash} from "@/UtilityFunctions";
 import {Operation} from "@/ui-components/Operation";
 import {UploadProtocol, WriteConflictPolicy} from "@/Files/Upload";
 import {bulkRequestOf, SensitivityLevelMap} from "@/DefaultObjects";
@@ -55,6 +55,7 @@ import MetadataNamespaceApi from "@/UCloud/MetadataNamespaceApi";
 import {useEffect, useState} from "react";
 import {SyncFolderSupport} from "./SyncFolderApi";
 import {getCookie} from "@/Login/Wayf";
+import {useHistory} from "react-router";
 
 export type UFile = Resource<ResourceUpdate, UFileStatus, UFileSpecification>;
 
@@ -243,12 +244,16 @@ class FilesApi extends ResourceApi<UFile, ProductStorage, UFileSpecification,
             if (!resource) return null;
             const sensitivity = useSensitivity(resource);
 
+            const extension = extensionFromPath(resource.id);
+            const isPreviewable = isExtPreviewSupported(extension) && resource.status.type === "FILE";
+
             return <Flex>
                 {resource.status.synced && getCookie("synchronization") ?
                     <div style={{cursor: "pointer"}} onClick={() => addSynchronizationDialog(resource, callbacks)}>
                         <Icon size={24} name="refresh" color="midGray" mt={7} mr={10} />
                     </div>
-                : null }
+                    : null}
+                {isPreviewable ? <Icon mt="6px" mr="12px" name="preview" cursor="pointer" onClick={() => callbacks.viewProperties(resource)} /> : null}
                 <div style={{cursor: "pointer"}} onClick={() => addFileSensitivityDialog(resource, callbacks.invokeCommand, callbacks.reload)}>
                     <Sensitivity sensitivity={sensitivity ?? "PRIVATE"} />
                 </div>

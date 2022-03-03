@@ -326,13 +326,13 @@ const DriveDropdown: React.FunctionComponent<{iconName: "hdd" | "projects"}> = p
 }
 
 const DriveInDropdown = styled.div`
-  padding: 0 17px;
-  width: 450px;
-  overflow-x: hidden;
+    padding: 0 17px;
+    width: 450px;
+    overflow-x: hidden;
 
-  &:hover {
-    background-color: var(--lightBlue);
-  }
+    &:hover {
+        background-color: var(--lightBlue);
+    }
 `;
 
 export default Router;
