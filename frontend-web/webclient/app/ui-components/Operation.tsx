@@ -162,7 +162,7 @@ export const Operations: OperationsType = props => {
         // Don't render anything if we are in row and we have selected something
         // if (props.selected.length > 0 && props.location === "IN_ROW") return null;
         if (!props.row) return null;
-        if (props.selected.length > 0 && !props.selected.includes(props.row)) return null;
+        if (props.selected.length > 0 && !props.selected.includes(props.row)) return <Box width="43px" />;
     }
 
     const selected = props.location === "IN_ROW" && props.selected.length === 0 ? [props.row!] : props.selected;
@@ -234,7 +234,7 @@ export const Operations: OperationsType = props => {
                         size={"1em"}
                         rotation={90}
                         data-tag={props.dropdownTag}
-                    /> : null
+                    /> : <Box width="33px" />
         )
     };
 
@@ -248,7 +248,7 @@ export const Operations: OperationsType = props => {
                 return <>
                     <InRowPrimaryButtons onClick={stopPropagation}>{primaryContent}</InRowPrimaryButtons>
                     <Box mr={"10px"} />
-                    {content.length === 0 ? <Box ml={"30px"} /> :
+                    {content.length === 0 ? null :
                         <Flex alignItems={"center"} justifyContent={"center"}>
                             <ClickableDropdown {...dropdownProps}>
                                 {content}
