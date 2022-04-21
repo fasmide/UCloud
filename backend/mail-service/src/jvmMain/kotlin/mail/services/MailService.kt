@@ -214,6 +214,9 @@ class MailService(
             is Mail.TransferApplicationMail -> {
                 transferOfApplication(recipient, mail.senderProject, mail.receiverProject, mail.applicationProjectTitle)
             }
+            is Mail.DowntimeMail -> {
+                downtime(recipient, mail.startTime, mail.endTime)
+            }
             is Mail.GrantApplicationWithdrawnMail -> {
                 closed(recipient, mail.projectTitle, mail.sender)
             }

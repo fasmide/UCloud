@@ -22,6 +22,7 @@ data class EmailSettings(
     val userRoleChange: Boolean = true,
     val userLeft: Boolean = true,
     val lowFunds: Boolean = true,
+    val downtime: Boolean = true,
 )
 
 
@@ -35,6 +36,14 @@ sealed class Mail {
         val receiverProject: String,
         val applicationProjectTitle: String,
         override val subject: String = "Application transfer"
+    ): Mail()
+
+    @Serializable
+    @SerialName("downtime")
+    data class DowntimeMail (
+        override val subject: String = "Expected downtime",
+        val startTime: Long,
+        val endTime:Long
     ): Mail()
 
     @Serializable

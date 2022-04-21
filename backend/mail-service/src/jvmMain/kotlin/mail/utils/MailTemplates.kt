@@ -1,6 +1,7 @@
 package dk.sdu.cloud.mail.utils
 
 import dk.sdu.cloud.service.escapeHtml
+import org.joda.time.LocalDateTime
 
 const val NO_NOTIFICATIONS_DISCLAIMER = """<p>If you do not want to receive these email notifications, 
     you can unsubscribe to non-critical emails in your <a href="https://cloud.sdu.dk/app/users/settings">personal settings</a> on UCloud</p>"""
@@ -12,6 +13,18 @@ fun transferOfApplication(receiver: String, senderProject: String, receiverProje
         <p>
             You have been transferred an application from the project '${escapeHtml(senderProject)}' to your project '${escapeHtml(receiverProject)}.
             Application is called: '${escapeHtml(applicationProjectTitle)}'
+        </p>
+        $NO_NOTIFICATIONS_DISCLAIMER
+    """.trimIndent()
+
+fun downtime(receiver: String, startTime: Long, endTime: Long) =
+    """
+        <p>Dear ${escapeHtml(receiver)}</p>
+                
+        <p>
+            One or more systems on UCloud have been scheduled for maintenance. 
+            Expected period: ${LocalDateTime(startTime)} - ${LocalDateTime(endTime)}. 
+            Login to UCloud to receive further information.
         </p>
         $NO_NOTIFICATIONS_DISCLAIMER
     """.trimIndent()

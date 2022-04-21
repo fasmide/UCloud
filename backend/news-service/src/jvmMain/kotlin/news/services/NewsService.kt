@@ -3,6 +3,10 @@ package dk.sdu.cloud.news.services
 import com.github.jasync.sql.db.RowData
 import dk.sdu.cloud.calls.HttpStatusCode
 import dk.sdu.cloud.calls.RPCException
+import dk.sdu.cloud.calls.client.call
+import dk.sdu.cloud.mail.api.Mail
+import dk.sdu.cloud.mail.api.MailDescriptions
+import dk.sdu.cloud.mail.api.SendRequestItem
 import dk.sdu.cloud.news.api.NewsPost
 import dk.sdu.cloud.service.NormalizedPaginationRequest
 import dk.sdu.cloud.service.Page
