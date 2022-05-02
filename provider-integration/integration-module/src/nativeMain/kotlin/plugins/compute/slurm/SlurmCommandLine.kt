@@ -15,6 +15,7 @@ object SlurmCommandLine {
     const val SSH_EXE = "/usr/bin/ssh"
     const val STTY_EXE = "/usr/bin/stty"
     const val PS_EXE = "/usr/bin/ps"
+    const val SCTL_EXE = "/usr/bin/scontrol"
 
     fun submitBatchJob(pathToFile: String): String {
         val (code, stdout, stderr) = executeCommandToText(SBATCH_EXE) {
@@ -95,12 +96,6 @@ object SlurmCommandLine {
     }
 
 
-    //Various cases to cover slurm compressed node format
-    //adev[1-2]
-    //adev[6,13,15]  
-    //adev[7-8,14]
-    //adev7
-    // or any combination thereof
 
     fun getJobNodeList(slurmId: String):Map<Int,String>{
 
@@ -111,6 +106,7 @@ object SlurmCommandLine {
             addArg("--parsable2")
             addArg("--allusers")
             addArg("--allocations")
+            addArg("--noheader")
         }
 
         return expandNodeList(stdout)
@@ -120,58 +116,19 @@ object SlurmCommandLine {
 
 
    fun expandNodeList(str: String):Map<Int,String> {
-
-            var nodes:MutableList<String> = mutableListOf()
             
-            //match single node c2, c3
-            val regexSingleNode = """[a-z]+\d+""".toRegex(setOf(RegexOption.IGNORE_CASE))
+        val (code, stdout, stderr) = executeCommandToText(SCTL_EXE) {
+            addEnv(SLURM_CONF_KEY, SLURM_CONF_VALUE)
+            addArg("show")
+            addArg("hostname")
+            addArg(str)
+        }
 
-            //match pattern c[001,3-5,0010]
-            val regexCompressed = """([a-z]+)           # group that matches set of at least one letter ex: nodename
-                                     \[                 # matches opening bracket ex: [
-                                     ([\d\,\-]+)        # group that matches set of digit, comma, minus, at least one occurence ex: 003,009-015
-                                     \]                 # matches closing bracket ex: ]
-                                  """.toRegex(setOf(RegexOption.COMMENTS, RegexOption.IGNORE_CASE))
-            
-            //match pattern c[001,3-5,0010]
-            val regexAny = """${regexCompressed}             # adev[1-5,8,9] c[1-2]
-                              |  							 # OR
-                              ${regexSingleNode}			 # c2 c6 c7
-                           """.toRegex(setOf(RegexOption.COMMENTS, RegexOption.IGNORE_CASE))
-            
-            
-            var iterator = regexAny.findAll(str).iterator()
-            
-    
-            //c[1,3-5]
-            while( iterator.hasNext() ) {
-                
-                val match = iterator.next()
-                val matchValue = match.value
-                val (nodeName, nodeNumbers) = match.destructured
-                
-                if( matchValue.matches(regexSingleNode) ) {
-                    
-                    nodes.add(matchValue)
-                    
-                } else if ( matchValue.matches(regexCompressed) )  {
+        if (code != 0) throw Exception("Unknown exception when performing expandNodeList")
+        val nodes = stdout.lines() 
+        if(nodes.isEmpty()) throw Exception("Empty NodeList")
 
-                    nodeNumbers.split(",").forEach{ seq -> 
-                        if(seq.contains("-")) {
-                            val min = seq.split("-")[0].toInt()
-                            val max = seq.split("-")[1].toInt()
-                            for (i in min..max) nodes.add("${nodeName}${i}")
-                        } else {
-                            nodes.add("${nodeName}${seq.toInt()}")
-                        }
-                    }
-                    
-                } else throw Exception("Unhandled pattern")
-
-            } 
-
-            if(nodes.isEmpty()) throw Exception("Empty NodeList")
-            return nodes.mapIndexedNotNull{idx, item -> idx to item}.toMap()
+        return nodes.mapIndexedNotNull{idx, item -> idx to item}.toMap()
 
     }
 
