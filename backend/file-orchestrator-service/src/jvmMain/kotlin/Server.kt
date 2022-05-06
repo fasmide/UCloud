@@ -11,7 +11,6 @@ import dk.sdu.cloud.file.orchestrator.rpc.*
 import dk.sdu.cloud.file.orchestrator.service.*
 import dk.sdu.cloud.micro.Micro
 import dk.sdu.cloud.micro.backgroundScope
-import dk.sdu.cloud.micro.redisConnectionManager
 import dk.sdu.cloud.service.*
 import dk.sdu.cloud.service.db.async.AsyncDBSessionFactory
 
@@ -61,20 +60,8 @@ class Server(override val micro: Micro) : CommonServer {
             fileCollections
         )
 
-        val syncProviders = Providers(serviceClient) { SimpleProviderCommunication(it.client, it.wsClient, it.provider) }
-        val syncSupport = ProviderSupport<SimpleProviderCommunication, Product.Synchronization, SyncDeviceSupport>(
-            syncProviders,
-            serviceClient,
-        ) { comms ->
-            SyncFolderProvider(comms.provider.id).retrieveProducts.call(Unit, comms.client).orThrow().responses
-        }
-        val syncDeviceService = SyncDeviceService(projectCache, db, syncProviders, syncSupport, serviceClient)
-        val syncFolderService = SyncFolderService(projectCache, db, syncProviders, syncSupport, serviceClient,
-            filesService, fileCollections, DistributedLockFactory(micro), micro.backgroundScope)
-
         filesService.addMoveHandler(metadataService::onFilesMoved)
-        filesService.addDeleteHandler(metadataService::onFilesDeleted)
-        syncFolderService.initialize()
+        filesService.addTrashHandler(metadataService::onFileMovedToTrash)
 
         configureControllers(
             FileMetadataController(metadataService),
@@ -82,8 +69,6 @@ class Server(override val micro: Micro) : CommonServer {
             FileCollectionController(fileCollections),
             FileMetadataTemplateController(metadataTemplateNamespaces),
             ShareController(shares),
-            syncDeviceService.asController(),
-            syncFolderService.asController()
         )
 
         startServices()

@@ -45,9 +45,11 @@ class EnvoyConfigurationService(
     fun start(port: Int?) {
         writeConfigurationFile(port ?: 8889)
 
+        val logFile = "/tmp/envoy.log"
+
         // TODO We probably cannot depend on this being allowed to download envoy for us. We need an alternative for
         //  people who don't what this.
-        startProcess(
+        val envoyPid = startProcess(
             args = listOf(
                 "/usr/local/bin/getenvoy",
                 "run",
@@ -59,12 +61,12 @@ class EnvoyConfigurationService(
 
             createStreams = {
                 val devnull = NativeFile.open("/dev/null", readOnly = false)
-                val logFile = NativeFile.open("/tmp/envoy.log", readOnly = false, truncateIfNeeded = true)
+                val logFile = NativeFile.open(logFile, readOnly = false, truncateIfNeeded = false)
                 ProcessStreams(devnull.fd, logFile.fd, logFile.fd)
             }
         )
 
-        ProcessingScope.launch {
+        val job = ProcessingScope.launch {
             val entries = hashMapOf<String, Pair<EnvoyRoute, EnvoyCluster?>>()
             run {
                 val id = "_UCloud"
@@ -91,6 +93,14 @@ class EnvoyConfigurationService(
                 val clusters = entries.values.mapNotNull { it.second }
                 configure(configDir, routes, clusters)
             }
+        }
+
+        ProcessWatcher.addWatchBlocking(envoyPid) { statusCode ->
+            log.warn("Envoy has died unexpectedly! It exited with $statusCode.")
+            log.warn("You might be able to read additional information from: $logFile")
+            log.warn("We will attempt to restart Envoy now!")
+            job.cancel()
+            start(port)
         }
     }
 

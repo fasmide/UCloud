@@ -63,3 +63,4 @@ object SlurmJobsIpcServer {
         }
     )
 }
+

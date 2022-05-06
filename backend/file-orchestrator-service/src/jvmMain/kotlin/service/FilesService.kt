@@ -2,6 +2,7 @@ package dk.sdu.cloud.file.orchestrator.service
 
 import dk.sdu.cloud.*
 import dk.sdu.cloud.accounting.api.Product
+import dk.sdu.cloud.accounting.api.ProductReference
 import dk.sdu.cloud.accounting.api.providers.*
 import dk.sdu.cloud.accounting.util.*
 import dk.sdu.cloud.calls.*
@@ -16,13 +17,15 @@ import dk.sdu.cloud.service.db.async.*
 import dk.sdu.cloud.task.api.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.lang.IllegalArgumentException
 
 typealias MoveHandler = suspend (batch: List<FilesMoveRequestItem>) -> Unit
-typealias DeleteHandler = suspend (batch: List<FindByStringId>) -> Unit
+typealias DeleteFileHandler = suspend (batch: List<FindByStringId>) -> Unit
 typealias TrashHandler = suspend (batch: List<FindByPath>) -> Unit
 
 class FilesService(
@@ -35,7 +38,7 @@ class FilesService(
     private val db: DBContext,
 ) : ResourceSvc<UFile, UFileIncludeFlags, UFileSpecification, UFileUpdate, Product.Storage, FSSupport> {
     private val moveHandlers = ArrayList<MoveHandler>()
-    private val deleteHandlers = ArrayList<DeleteHandler>()
+    private val deleteHandlers = ArrayList<DeleteFileHandler>()
     private val trashHandlers = ArrayList<TrashHandler>()
     private val proxy =
         ProviderProxy<StorageCommunication, Product.Storage, FSSupport, UFile>(providers, providerSupport)
@@ -47,6 +50,34 @@ class FilesService(
 
     private var cachedSensitivityTemplate: FileMetadataTemplate? = null
     private val sensitivityTemplateMutex = Mutex()
+    private var ucloudShareReference: ProductReference? = null
+
+    init {
+        ucloudShareReference =  runBlocking {
+            db.withSession { session ->
+                session
+                    .sendPreparedStatement(
+                        """
+                        select r.type, pc.category, pc.provider
+                        from provider.resource r
+                        join accounting.products p on p.id = r.product
+                        join accounting.product_categories pc on pc.id = p.category
+                        where r.type = 'share' and
+                            r.provider = 'ucloud'
+                    """.trimIndent()
+                    ).rows
+                    .singleOrNull()?.let {
+                        ProductReference(
+                            it.getString(0)!!,
+                            it.getString(1)!!,
+                            it.getString(2)!!
+                        )
+                    }
+
+            }
+        }
+    }
+
     private suspend fun retrieveSensitivityTemplate(): FileMetadataTemplate {
         if (cachedSensitivityTemplate != null) {
             return cachedSensitivityTemplate!!
@@ -79,7 +110,7 @@ class FilesService(
         moveHandlers.add(handler)
     }
 
-    fun addDeleteHandler(handler: DeleteHandler) {
+    fun addDeleteFileHandler(handler: DeleteFileHandler) {
         deleteHandlers.add(handler)
     }
 
@@ -156,49 +187,58 @@ class FilesService(
                 }
             }
 
-            val syncFolderJob = async {
-                if (request.flags.includeSyncStatus == true) {
-                    db.withSession { session ->
-                        session.sendPreparedStatement(
-                            {
-                                setParameter("filter_user", actorAndProject.actor.username)
-                                setParameter("filter_parent", request.flags.path)
-                            },
-                            """
-                                select ('/' || f.collection || f.sub_path) as path
-                                from file_orchestrator.sync_folders f
-                                join provider.resource r on f.resource = r.id
-                                where
-                                    ('/' || f.collection || f.sub_path) like (:filter_parent || '/%') and
-                                    ('/' || f.collection || f.sub_path) not like (:filter_parent || '/%/%') and
-                                    :filter_user = r.created_by
-                            """
-                        )
-                    }
-                } else {
-                    null
-                }
-            }
-
             val browse = browseJob.await()
             val metadata = metadataJob.await()
-            val syncFolder = syncFolderJob.await()?.rows?.map {
-                it.getString("path").orEmpty()
-            }
 
             browse.mapItems {
-                it.toUFile(resolvedCollection, metadata, syncFolder)
+                it.toUFile(resolvedCollection, metadata)
             }
+        }
+    }
+
+    /*
+     * ReplaceString should begin with / and end with /
+     */
+    suspend fun replaceFileCollectionIdWhenShare(path: String) : String {
+        if (path.startsWith("/")) {
+            val id = "/" + path.components().first()
+            val replaceString = db.withSession { session ->
+                session
+                    .sendPreparedStatement(
+                        {
+                            setParameter("id", id)
+                        },
+                        """
+                            select original_file_path
+                            from file_orchestrator.shares
+                            where available_at = :id
+                        """
+                    ).rows
+                    .singleOrNull()
+                    ?.getString(0)
+                    ?: throw RPCException.fromStatusCode(HttpStatusCode.BadRequest, "share path missing")
+            }
+            if (replaceString.startsWith("/")) {
+                return path.replace(Regex("""^\/\d+"""), replaceString)
+            } else {
+                throw IllegalArgumentException("Should start with /")
+            }
+        } else {
+            throw IllegalArgumentException("Path should start with /")
         }
     }
 
     private suspend fun PartialUFile.toUFile(
         resolvedCollection: FileCollection,
         metadata: MetadataService.RetrieveWithHistory?,
-        syncedPaths: List<String>? = null
     ): UFile {
         val metadataHistory = if (metadata != null) {
-            val inheritedMetadata = id.parents().asReversed().mapNotNull { parent ->
+            val resolvedIdIfShare = if (ucloudShareReference != null && resolvedCollection.specification.product == ucloudShareReference) {
+                replaceFileCollectionIdWhenShare(id)
+            } else {
+                id
+            }
+            val inheritedMetadata = resolvedIdIfShare.parents().asReversed().mapNotNull { parent ->
                 metadata.metadataByFile[parent.removeSuffix("/")]?.mapNotNull { (template, docs) ->
                     // Pick only the latest version and only if it is not a deletion
                     // NOTE(Dan): If any has been approved, it will always be placed as the first element. This is also
@@ -213,7 +253,6 @@ class FilesService(
                     }
                 }?.toMap()
             }
-
             val templates = metadata.templates.toMutableMap()
             val history = HashMap<String, List<FileMetadataOrDeleted>>()
             // NOTE(Dan): First we pre-fill the history with the inherited metadata. This metadata is sorted such that
@@ -226,7 +265,8 @@ class FilesService(
                 }
             }
             // NOTE(Dan): And then we insert the local metadata, overriding any existing entry.
-            val ownMetadata = metadata.metadataByFile[id] ?: emptyMap()
+
+            val ownMetadata = metadata.metadataByFile[resolvedIdIfShare] ?: emptyMap()
             ownMetadata.forEach { (template, docs) ->
                 history[template] = docs
             }
@@ -259,8 +299,6 @@ class FilesService(
             null
         }
 
-        val synced = syncedPaths?.contains(id) == true
-
         return UFile(
             id,
             UFileSpecification(
@@ -268,7 +306,7 @@ class FilesService(
                 resolvedCollection.specification.product
             ),
             createdAt,
-            status.copy(metadata = metadataHistory, synced = synced),
+            status.copy(metadata = metadataHistory),
             owner ?: resolvedCollection.owner,
             permissions ?: resolvedCollection.permissions,
         )

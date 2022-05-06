@@ -45,7 +45,7 @@ export interface JobSpecification extends ResourceSpecification {
     openedFile?: string;
 }
 
-export type JobState = "IN_QUEUE" | "RUNNING" | "CANCELING" | "SUCCESS" | "FAILURE" | "EXPIRED";
+export type JobState = "IN_QUEUE" | "RUNNING" | "CANCELING" | "SUCCESS" | "FAILURE" | "EXPIRED" | "SUSPENDED";
 export function isJobStateFinal(state: JobState): boolean {
     switch (state) {
         case "SUCCESS":
@@ -237,8 +237,8 @@ class JobApi extends ResourceApi<Job, ProductCompute, JobSpecification, JobUpdat
 
             const job = resource as Job;
             const [icon, color] = jobStateToIconAndColor(job.status.state);
-            return <Flex width={"120px"} height={"27px"}><Icon name={icon} color={color} mr={"8px"} />
-                <Box mt={"-3px"}>{stateToTitle(job.status.state)}</Box>
+            return <Flex width={"120px"} mt="4px" height={"27px"}><Icon name={icon} color={color} mr={"8px"} />
+                <Box mt={"-2px"}>{stateToTitle(job.status.state)}</Box>
             </Flex>
         }
     };
