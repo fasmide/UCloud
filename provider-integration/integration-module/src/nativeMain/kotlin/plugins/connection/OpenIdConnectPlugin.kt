@@ -72,7 +72,7 @@ class OpenIdConnectPlugin : ConnectionPlugin {
 
     override fun PluginContext.initializeRpcServer(server: RpcServer) {
         // Token validator used to verify tokens returned by the OpenID provider (explained below).
-        val accessTokenValidator = NativeJWTValidation(configuration.certificate)
+        val accessTokenValidator = NativeJWTValidation(normalizeCertificate(configuration.certificate))
 
         // Implemented by the integration module (see explanation below)
         val openIdClientApi = object : CallDescriptionContainer("openidclient") {
@@ -145,7 +145,7 @@ class OpenIdConnectPlugin : ConnectionPlugin {
                             append("&redirect_uri=")
                             append(ownHost.scheme)
                             append("://")
-                            append(ownHost.host)
+                            append("localhost")
                             append(":")
                             append(ownHost.port)
                             append("/connection/oidc-cb")
@@ -223,7 +223,7 @@ class OpenIdConnectPlugin : ConnectionPlugin {
                     throw RPCException.fromStatusCode(HttpStatusCode.BadRequest)
                 }
 
-                log.debug("OIDC success! Subject is $subject")
+                log.debug("OIDC success! Subject is ${subject} ")
 
                 val result = onConnectionComplete.invoke(configuration.extensions.onConnectionComplete, subject)
                 UserMapping.insertMapping(subject.ucloudIdentity, result.uid, this@initializeRpcServer, mappingExpiration())
@@ -266,7 +266,7 @@ class OpenIdConnectPlugin : ConnectionPlugin {
                 append("&redirect_uri=")
                 append(ownHost.scheme)
                 append("://")
-                append(ownHost.host)
+                append("localhost")
                 append(":")
                 append(ownHost.port)
                 append("/connection/oidc-cb")

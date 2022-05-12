@@ -150,12 +150,32 @@ fun runInstaller(
             ).writeText(
                 """
                     connection:
-                        type: UCloud
+                        # Specifies the plugin type. The remaining configuration is specific to this plugin.
+                        type: OpenIdConnect
 
-                        redirectTo: http://localhost:9000/app
+                        # Certificate used for verifying OIDC tokens.
+                        certificate: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkywzuw1vysFj2iAyEarB9TiNv8btUlbENPMNlyC2/kFHurCzq/5ilbWmbhqhxFdGXVoXvxmh1XirODAjcb2wRgCDNk1O8cDdygG4d7xOihdKxey/U8m/3rZelgQ+O4HjcXAslW4vKY6RTCIbXNEjSKD43Av7UDby7U45G1ibWnhagJCz/5kNjp1YNUHiDqP+v105z6OxOPZgKfXrZKGcIMsQFyOsKvFcYGxd0p/aTfwcN/5M1exXa5kxU5B469dDjGWcypqWJ+iLTdCyHehe4AJZoL2PK5Uh5qIdGnbdoY+T5d7hQz6MIgUDRfaIVD1Sik6J/dRLcXwY2AT6C3SY8QIDAQAB
 
+                        # Determines for how long we should consider the connection valid. Once the time-to-live has expired, the user
+                        # must reestablish the connection.
+                        mappingTimeToLive:
+                            days: 7
+
+                        # Endpoints used in the OIDC protocol.
+                        endpoints:
+                            auth: http://localhost:61241/realms/master/protocol/openid-connect/auth
+                            token: http://keycloak:8080/realms/master/protocol/openid-connect/token
+
+                        # Client information used in the OIDC protocol.
+                        client:
+                            id: im-client-id
+                            secret: 52VsKbfcC1zHcCDarNRJQGFawhqZUk7i
+
+                        # Extensions which will be invoked by the plugin when certain events occur.
                         extensions:
-                            onConnectionComplete: /opt/ucloud/example-extensions/ucloud-connection
+                            # Invoked when the connection has completed.
+                            onConnectionComplete: /opt/ucloud/example-extensions/oidc-extension
+                        redirectUrl: localhost:8080
 
                     projects:
                         type: Simple

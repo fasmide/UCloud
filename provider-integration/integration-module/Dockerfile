@@ -24,7 +24,7 @@ RUN useradd -u 999 -g 997 munge
 RUN useradd --system --user-group ucloud 
 RUN mkdir -p /var/run/ucloud/envoy
 RUN chown -R ucloud: /var/run/ucloud
-RUN echo 'ucloud  ALL=(%ucloud) NOPASSWD: /usr/bin/ucloud, /opt/ucloud/build/bin/native/debugExecutable/ucloud-integration-module.kexe' >> /etc/sudoers
+RUN echo 'ucloud  ALL=(%ucloud) NOPASSWD: /usr/bin/ucloud, /opt/ucloud/build/bin/native/debugExecutable/ucloud-integration-module.kexe, /opt/ucloud/example-extensions/oidc-extension, /opt/ucloud/example-extensions/project-extension ' >> /etc/sudoers
 
 
 
