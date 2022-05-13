@@ -34,7 +34,7 @@ phone_number_verified: bool = request.get('phoneNumberVerified')
 
 # NOTE(Dan): In this example, we assume that we can use the subject as a username. The example is written to support
 # keycloak's user IDs. As a result, we remove '-' to obtain a valid unix username.
-local_username = subject.replace('-', '')
+local_username = "testuser" #subject.replace('-', '')
 
 response = {}
 
